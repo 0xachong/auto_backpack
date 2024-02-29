@@ -95,7 +95,7 @@ def ExeOrder(side,price,quantity):
     ts = str(int(time.time() * 1000))
     data = {
         "orderType":"Limit",
-        "postOnly":True, # 是否只做maker,就是如果为false可以挂限价单，true为市价单，无法成交即时取消
+        # "postOnly":True, # 是否只做maker,就是如果为false可以挂限价单，true为市价单，无法成交即时取消
         "price":price,
         "quantity":quantity,
         "side":side, # bid是买入，ask是卖出
@@ -106,10 +106,14 @@ def ExeOrder(side,price,quantity):
     res = requests.post(url,data=json.dumps(data),headers=headers)
     if res.status_code == 200:
         print(json.dumps(data))
+    else:
+        print("下单失败",side,res.text)
     return res
 
 def PrintCapital(pair):
     capital = GetCapital().json()
+    print(GetCapital().status_code)
+    print(capital)
     pair_0 = pair.split("_")[0]
     pair_1 = pair.split("_")[1]
     start_p_0 = capital[pair_0]["available"]
@@ -135,20 +139,26 @@ def AutoTrade():
     times=input(">>>>> 请输入交易次数(default:100)")
     times = int(times) if times != "" else 100
     trade_num=input(">>>>> 请输入交易数量(default:0.5)")
-    trade_num = int(trade_num) if trade_num != "" else 0.5
+    trade_num = float(trade_num) if trade_num != "" else 0.5
     i = 0
+    is_bid = True
     while i <int(times):
         depth= GetDepth().json()
         asks = depth["asks"]
         bids = depth["bids"]
-        ask = asks[0][0]
-        bid = bids[-1][0]
-        res = Buy(ask,trade_num)
-        # print(res.status_code,res.text)
-        res = Sell(bid,trade_num)
-        # print(res.status_code,res.text)
-        if res.status_code == 200:
-            i += 1
+        ask = asks[2][0]
+        bid = bids[-2][0]
+        if is_bid:
+            res = Buy(ask,trade_num)
+            if res.status_code != 200:
+                continue
+            is_bid=False
+        else :
+            res = Sell(bid,trade_num)
+            if res.status_code != 200:
+                continue
+            is_bid=True
+            i+=1
     end_total = PrintCapital(pair)
     price =float(GetTicker().json()["lastPrice"])
     volumn = float(price)*trade_num*times*2 # 买卖各记一次交易额
